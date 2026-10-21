@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="theme-color" content="#0f172a">
+    <title>Check-in PyCon Panamá 2026</title>
+    <style>
+        :root {
+            --fondo: #0f172a;
+            --panel: #1e293b;
+            --borde: #334155;
+            --texto: #f8fafc;
+            --texto-2: #cbd5e1;
+            --acento: #38bdf8;
+            --verde: #16a34a;
+            --ambar: #d97706;
+            --rojo: #dc2626;
+        }
+        * { box-sizing: border-box; }
+        html, body { margin: 0; background: var(--fondo); color: var(--texto); }
+        body {
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+            font-size: 17px;
+            line-height: 1.4;
+            min-height: 100dvh;
+            padding: env(safe-area-inset-top) 16px calc(env(safe-area-inset-bottom) + 16px);
+        }
+        [hidden] { display: none !important; }
+        header {
+            display: flex; align-items: center; justify-content: space-between; gap: 8px;
+            padding: 14px 0;
+        }
+        header h1 { font-size: 1.05rem; margin: 0; }
+        header small { color: var(--texto-2); display: block; font-weight: 400; }
+        main { max-width: 520px; margin: 0 auto; }
+        .panel { background: var(--panel); border: 1px solid var(--borde); border-radius: 14px; padding: 18px; }
+        label { display: block; font-weight: 600; margin: 12px 0 6px; }
+        input {
+            width: 100%; font: inherit; color: var(--texto); background: var(--fondo);
+            border: 1px solid var(--borde); border-radius: 10px; padding: 14px;
+        }
+        input:focus { outline: 2px solid var(--acento); outline-offset: 1px; }
+        button {
+            font: inherit; font-weight: 700; border: 0; border-radius: 10px; cursor: pointer;
+            padding: 14px 16px; background: var(--acento); color: #0b1220;
+        }
+        button.secundario { background: transparent; color: var(--texto-2); border: 1px solid var(--borde); padding: 8px 12px; font-weight: 600; }
+        button:disabled { opacity: .6; cursor: wait; }
+        .ancho { width: 100%; margin-top: 18px; }
+        .error { color: #fca5a5; min-height: 1.4em; margin: 10px 0 0; }
+        .pestanas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+        .pestanas button { background: var(--panel); color: var(--texto-2); border: 1px solid var(--borde); }
+        .pestanas button[aria-selected="true"] { background: var(--acento); color: #0b1220; border-color: var(--acento); }
+        #lector { width: 100%; border-radius: 14px; overflow: hidden; background: #000; min-height: 260px; }
+        #lector video { width: 100% !important; height: auto !important; }
+        .ayuda { color: var(--texto-2); font-size: .92rem; margin: 10px 0 0; }
+        .resultado {
+            border-radius: 14px; padding: 22px 18px; margin-top: 14px; text-align: center;
+            font-weight: 700;
+        }
+        .resultado .grande { font-size: 1.5rem; display: block; margin-bottom: 4px; }
+        .resultado .nota { font-weight: 500; display: block; margin-top: 8px; font-size: .95rem; }
+        .resultado.nuevo { background: var(--verde); }
+        .resultado.repetido { background: var(--ambar); }
+        .resultado.no_valido, .resultado.fallo { background: var(--rojo); }
+        ul.lista { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+        ul.lista li {
+            display: flex; align-items: center; justify-content: space-between; gap: 10px;
+            background: var(--fondo); border: 1px solid var(--borde); border-radius: 10px; padding: 12px;
+        }
+        ul.lista .persona { min-width: 0; }
+        ul.lista .persona strong { display: block; overflow-wrap: anywhere; }
+        ul.lista .persona span { color: var(--texto-2); font-size: .9rem; overflow-wrap: anywhere; }
+        ul.lista .ya { color: #fcd34d; font-weight: 700; white-space: nowrap; font-size: .95rem; }
+        ul.lista button { white-space: nowrap; padding: 10px 12px; }
+    </style>
+</head>
+<body>
+<main>
+    <header>
+        <h1>Check-in PyCon Panamá 2026<small id="quien"></small></h1>
+        <button id="btnSalir" class="secundario" type="button" hidden>Salir</button>
+    </header>
+
+    <!-- Inicio de sesión -->
+    <section id="vistaLogin" class="panel" hidden>
+        <form id="formLogin">
+            <label for="email">Correo</label>
+            <input id="email" type="email" autocomplete="username" required>
+            <label for="password">Contraseña</label>
+            <input id="password" type="password" autocomplete="current-password" required>
+            <button id="btnEntrar" class="ancho" type="submit">Entrar</button>
+            <p id="errorLogin" class="error" role="alert"></p>
+        </form>
+    </section>
+
+    <!-- Check-in -->
+    <section id="vistaCheckin" hidden>
+        <div class="pestanas" role="tablist">
+            <button id="tabEscanear" type="button" role="tab" aria-selected="true">Escanear QR</button>
+            <button id="tabBuscar" type="button" role="tab" aria-selected="false">Buscar</button>
+        </div>
+
+        <div id="panelEscanear">
+            <div id="lector"></div>
+            <p id="ayudaCamara" class="ayuda">Apunta la cámara al código QR de la persona.</p>
+        </div>
+
+        <div id="panelBuscar" class="panel" hidden>
+            <label for="buscar">Nombre o correo</label>
+            <input id="buscar" type="search" autocomplete="off" placeholder="Mínimo 3 letras">
+            <ul id="resultados" class="lista"></ul>
+            <p id="sinResultados" class="ayuda" hidden>Sin resultados.</p>
+        </div>
+
+        <div id="resultado" class="resultado" role="status" aria-live="assertive" hidden></div>
+    </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js" integrity="sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" integrity="sha384-c9d8RFSL+u3exBOJ4Yp3HUJXS4znl9f+z66d1y54ig+ea249SpqR+w1wyvXz/lk+" crossorigin="anonymous"></script>
+<script src="env.js"></script>
+<script>
+(function () {
+    const db = window.supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonKey);
+    const $ = id => document.getElementById(id);
+    const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+    const PAUSA_MS = 2500;
+
+    let lector = null;
+    let ocupado = false;
+    let ultimoToken = '';
+    let ultimoTokenEn = 0;
+    let temporizadorResultado = null;
+
+    // ─── Resultado en pantalla ────────────────────────────────────────────
+
+    function mostrarResultado(clase, grande, detalle, nota) {
+        const caja = $('resultado');
+        caja.className = 'resultado ' + clase;
+        caja.replaceChildren();
+        const g = document.createElement('span');
+        g.className = 'grande';
+        g.textContent = grande;
+        caja.append(g);
+        if (detalle) caja.append(document.createTextNode(detalle));
+        if (nota) {
+            const n = document.createElement('span');
+            n.className = 'nota';
+            n.textContent = nota;
+            caja.append(n);
+        }
+        caja.hidden = false;
+        if (navigator.vibrate) navigator.vibrate(clase === 'nuevo' ? 120 : [80, 60, 80]);
+        clearTimeout(temporizadorResultado);
+        temporizadorResultado = setTimeout(() => { caja.hidden = true; }, 6000);
+    }
+
+    function mostrarRespuesta(r) {
+        if (r.estado === 'nuevo') {
+            mostrarResultado('nuevo', '✓ ¡Adelante!', r.nombre,
+                r.inscrito_hoy === false ? 'No se inscribió como presencial para hoy. Puede pasar.' : '');
+        } else if (r.estado === 'repetido') {
+            mostrarResultado('repetido', 'Ya registrada', r.nombre + ' · entró a las ' + r.hora,
+                'Si es la misma persona, puede pasar.');
+        } else {
+            mostrarResultado('no_valido', '✕ QR no válido', '', 'Búscala por nombre en la pestaña «Buscar».');
+        }
+    }
+
+    function mostrarFallo(error) {
+        if (error && error.code === '42501') {
+            mostrarResultado('fallo', 'Cuenta no autorizada', '', 'Pide a la organización que habilite tu cuenta.');
+        } else {
+            mostrarResultado('fallo', 'Sin conexión', '', 'No se guardó. Intenta de nuevo.');
+        }
+    }
+
+    async function marcar(token, metodo) {
+        const { data, error } = await db.rpc('checkin_marcar', { p_token: token, p_metodo: metodo });
+        if (error) {
+            mostrarFallo(error);
+            return null;
+        }
+        mostrarRespuesta(data);
+        return data;
+    }
+
+    // ─── Escáner ──────────────────────────────────────────────────────────
+
+    async function alLeerQR(texto) {
+        const coincidencia = String(texto).match(UUID);
+        const token = coincidencia ? coincidencia[0].toLowerCase() : '';
+        const ahora = Date.now();
+        // La cámara lee el mismo código varias veces por segundo.
+        if (ocupado || (token && token === ultimoToken && ahora - ultimoTokenEn < PAUSA_MS * 2)) return;
+        ocupado = true;
+        ultimoToken = token;
+        ultimoTokenEn = ahora;
+        try {
+            if (!token) {
+                mostrarRespuesta({ estado: 'no_valido' });
+            } else {
+                await marcar(token, 'qr');
+            }
+        } finally {
+            setTimeout(() => { ocupado = false; }, PAUSA_MS);
+        }
+    }
+
+    async function encenderCamara() {
+        if (lector && lector.isScanning) return;
+        lector = lector || new Html5Qrcode('lector');
+        try {
+            await lector.start(
+                { facingMode: 'environment' },
+                { fps: 10, qrbox: (w, h) => { const l = Math.floor(Math.min(w, h) * 0.7); return { width: l, height: l }; } },
+                alLeerQR,
+                () => {}
+            );
+            $('ayudaCamara').textContent = 'Apunta la cámara al código QR de la persona.';
+        } catch (e) {
+            $('ayudaCamara').textContent = 'No se pudo abrir la cámara. Revisa el permiso de cámara del navegador y recarga la página, o usa «Buscar».';
+        }
+    }
+
+    async function apagarCamara() {
+        if (lector && lector.isScanning) {
+            try { await lector.stop(); } catch (e) { /* ya estaba detenida */ }
+        }
+    }
+
+    // ─── Búsqueda manual ──────────────────────────────────────────────────
+
+    let temporizadorBusqueda = null;
+    let busquedaActual = 0;
+
+    async function buscar() {
+        const texto = $('buscar').value.trim();
+        const lista = $('resultados');
+        const id = ++busquedaActual;
+        if (texto.length < 3) {
+            lista.replaceChildren();
+            $('sinResultados').hidden = true;
+            return;
+        }
+        const { data, error } = await db.rpc('checkin_buscar', { p_texto: texto });
+        if (id !== busquedaActual) return;
+        if (error) {
+            mostrarFallo(error);
+            return;
+        }
+        lista.replaceChildren(...data.map(filaPersona));
+        $('sinResultados').hidden = data.length > 0;
+    }
+
+    function filaPersona(p) {
+        const li = document.createElement('li');
+        const info = document.createElement('div');
+        info.className = 'persona';
+        const nombre = document.createElement('strong');
+        nombre.textContent = p.nombre;
+        const correo = document.createElement('span');
+        correo.textContent = p.correo;
+        info.append(nombre, correo);
+        li.append(info);
+
+        if (p.marcado_hoy) {
+            const ya = document.createElement('span');
+            ya.className = 'ya';
+            ya.textContent = 'Entró ' + p.marcado_hoy;
+            li.append(ya);
+        } else {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.textContent = 'Marcar entrada';
+            btn.addEventListener('click', async () => {
+                btn.disabled = true;
+                const r = await marcar(p.token, 'manual');
+                if (r) buscar();
+                else btn.disabled = false;
+            });
+            li.append(btn);
+        }
+        return li;
+    }
+
+    $('buscar').addEventListener('input', () => {
+        clearTimeout(temporizadorBusqueda);
+        temporizadorBusqueda = setTimeout(buscar, 300);
+    });
+
+    // ─── Pestañas ─────────────────────────────────────────────────────────
+
+    function elegirPestana(escanear) {
+        $('tabEscanear').setAttribute('aria-selected', String(escanear));
+        $('tabBuscar').setAttribute('aria-selected', String(!escanear));
+        $('panelEscanear').hidden = !escanear;
+        $('panelBuscar').hidden = escanear;
+        if (escanear) {
+            encenderCamara();
+        } else {
+            apagarCamara();
+            $('buscar').focus();
+        }
+    }
+
+    $('tabEscanear').addEventListener('click', () => elegirPestana(true));
+    $('tabBuscar').addEventListener('click', () => elegirPestana(false));
+
+    // ─── Sesión ───────────────────────────────────────────────────────────
+
+    async function verificarVoluntario() {
+        // Con menos de 3 letras no devuelve datos: solo comprueba la autorización.
+        const { error } = await db.rpc('checkin_buscar', { p_texto: '' });
+        return error ? (error.code === '42501' ? 'no_autorizado' : 'fallo') : 'ok';
+    }
+
+    async function mostrarVista(session) {
+        if (!session) {
+            await apagarCamara();
+            $('vistaCheckin').hidden = true;
+            $('btnSalir').hidden = true;
+            $('quien').textContent = '';
+            $('vistaLogin').hidden = false;
+            return;
+        }
+        const estado = await verificarVoluntario();
+        if (estado === 'no_autorizado') {
+            await db.auth.signOut();
+            $('errorLogin').textContent = 'Tu cuenta no está habilitada como voluntaria de check-in.';
+            return;
+        }
+        $('vistaLogin').hidden = true;
+        $('vistaCheckin').hidden = false;
+        $('btnSalir').hidden = false;
+        $('quien').textContent = session.user.email;
+        if (estado === 'fallo') mostrarFallo(null);
+        elegirPestana(true);
+    }
+
+    $('formLogin').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        $('errorLogin').textContent = '';
+        $('btnEntrar').disabled = true;
+        const { data, error } = await db.auth.signInWithPassword({
+            email: $('email').value.trim(),
+            password: $('password').value
+        });
+        $('btnEntrar').disabled = false;
+        if (error) {
+            $('errorLogin').textContent = 'Correo o contraseña incorrectos.';
+            return;
+        }
+        $('password').value = '';
+        mostrarVista(data.session);
+    });
+
+    $('btnSalir').addEventListener('click', async () => {
+        await db.auth.signOut();
+        mostrarVista(null);
+    });
+
+    db.auth.getSession().then(({ data }) => mostrarVista(data.session));
+})();
+</script>
+</body>
+</html>
